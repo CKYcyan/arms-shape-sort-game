@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>形狀分類小遊戲</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #fff;
+      overflow-x: hidden;
+    }
+
+    /* ── 畫面切換 ── */
+    .screen { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+    .screen.active { display: flex; }
+
+    /* ══ 開場畫面 ══ */
+    #screen-start { text-align: center; gap: 24px; }
+    #screen-start h1 { font-size: clamp(2rem, 5vw, 3.5rem); letter-spacing: 4px; background: linear-gradient(90deg, #e94560, #f5a623); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    #screen-start p { font-size: clamp(1rem, 2.5vw, 1.25rem); color: #aac4ff; max-width: 500px; line-height: 1.8; }
+    .start-shapes { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+    .start-shapes svg { filter: drop-shadow(0 4px 12px rgba(233,69,96,0.5)); }
+    .btn-start {
+      padding: 16px 48px; font-size: 1.3rem; border: none; border-radius: 50px;
+      background: linear-gradient(90deg, #e94560, #f5a623);
+      color: #fff; cursor: pointer; letter-spacing: 2px; font-weight: bold;
+      box-shadow: 0 8px 30px rgba(233,69,96,0.4);
+      transition: transform .2s, box-shadow .2s;
+    }
+    .btn-start:hover { transform: scale(1.06); box-shadow: 0 12px 40px rgba(233,69,96,0.6); }
+
+    /* ══ 遊戲畫面 ══ */
+    #screen-game { justify-content: flex-start; padding: 16px 20px 20px; gap: 16px; }
+
+    .game-header { width: 100%; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+    .game-title { font-size: 1.3rem; font-weight: bold; color: #aac4ff; letter-spacing: 2px; }
+    .progress-info { font-size: 1rem; color: #f5a623; }
+
+    /* 待分類區 */
+    .items-panel {
+      width: 100%; background: rgba(255,255,255,0.05);
+      border: 2px dashed rgba(255,255,255,0.2);
+      border-radius: 20px; padding: 20px;
+      display: flex; flex-wrap: wrap; gap: 16px;
+      justify-content: center; align-items: center;
+      min-height: 130px;
+    }
+    .items-panel-label { width: 100%; text-align: center; font-size: 0.9rem; color: rgba(255,255,255,0.4); margin-bottom: -8px; }
+
+    /* 分類框區 */
+    .drop-zones { width: 100%; display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
+
+    .drop-zone {
+      flex: 1 1 160px; max-width: 200px; min-height: 140px;
+      border: 3px dashed rgba(255,255,255,0.25);
+      border-radius: 18px; padding: 12px 8px 8px;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      transition: background .25s, border-color .25s, transform .15s;
+      position: relative;
+    }
+    .drop-zone .zone-label {
+      font-size: 0.95rem; font-weight: bold; letter-spacing: 1px;
+      padding: 4px 12px; border-radius: 50px;
+      background: rgba(255,255,255,0.1); color: #fff;
+      white-space: nowrap;
+    }
+    .drop-zone .zone-content { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .drop-zone.drag-over { background: rgba(255,255,255,0.12); border-color: #f5a623; transform: scale(1.03); }
+
+    /* 拖曳元件 */
+    .shape-item {
+      width: 80px; height: 80px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: grab; border-radius: 12px;
+      background: rgba(255,255,255,0.08);
+      border: 2px solid rgba(255,255,255,0.15);
+      transition: transform .15s, box-shadow .15s;
+      touch-action: none;
+      position: relative;
+      user-select: none;
+    }
+    .shape-item:hover { transform: scale(1.1); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+    .shape-item.dragging { opacity: 0.4; transform: scale(0.95); }
+    .shape-item svg { pointer-events: none; }
+
+    /* 在分類框內縮小 */
+    .drop-zone .shape-item { width: 56px; height: 56px; }
+    .drop-zone .shape-item svg { width: 40px; height: 40px; }
+
+    /* 提交按鈕 */
+    .btn-submit {
+      padding: 14px 40px; font-size: 1.15rem; border: none; border-radius: 50px;
+      background: linear-gradient(90deg, #43e97b, #38f9d7);
+      color: #1a1a2e; cursor: pointer; font-weight: bold; letter-spacing: 2px;
+      box-shadow: 0 6px 24px rgba(67,233,123,0.3);
+      transition: transform .2s, box-shadow .2s, opacity .2s;
+    }
+    .btn-submit:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+    .btn-submit:not(:disabled):hover { transform: scale(1.05); box-shadow: 0 10px 30px rgba(67,233,123,0.5); }
+
+    /* ══ 結果畫面 ══ */
+    #screen-result { text-align: center; gap: 24px; }
+    .result-score-big {
+      font-size: clamp(4rem, 12vw, 7rem); font-weight: 900;
+      background: linear-gradient(90deg, #43e97b, #38f9d7);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      line-height: 1;
+    }
+    .result-subtitle { font-size: 1.3rem; color: #aac4ff; }
+    .result-list {
+      width: 100%; max-width: 560px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .result-row {
+      display: flex; align-items: center; gap: 14px;
+      background: rgba(255,255,255,0.07); border-radius: 14px;
+      padding: 10px 16px; border: 2px solid transparent;
+    }
+    .result-row.correct { border-color: #43e97b; }
+    .result-row.wrong   { border-color: #e94560; }
+    .result-row .icon { font-size: 1.5rem; }
+    .result-row .shape-name { flex: 1; text-align: left; font-size: 1rem; font-weight: bold; }
+    .result-row .answer-text { font-size: 0.9rem; color: rgba(255,255,255,0.6); text-align: right; }
+    .result-row.wrong .answer-text { color: #ff8fa0; }
+
+    .result-msg { font-size: 1.1rem; color: #f5a623; max-width: 420px; line-height: 1.7; }
+
+    .btn-restart {
+      padding: 14px 40px; font-size: 1.1rem; border: none; border-radius: 50px;
+      background: linear-gradient(90deg, #e94560, #f5a623);
+      color: #fff; cursor: pointer; font-weight: bold; letter-spacing: 2px;
+      transition: transform .2s;
+    }
+    .btn-restart:hover { transform: scale(1.05); }
+
+    /* ── 浮動拖曳複製 ── */
+    #drag-ghost {
+      position: fixed; pointer-events: none; z-index: 9999;
+      opacity: 0.85; transform: scale(1.15);
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════ 浮動拖曳 ghost ════ -->
+<div id="drag-ghost"></div>
+
+<!-- ════ 開場畫面 ════ -->
+<div id="screen-start" class="screen active">
+  <h1>形狀分類挑戰</h1>
+  <div class="start-shapes">
+    <!-- 預覽形狀 -->
+    <svg width="60" height="60" viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" fill="#e94560" opacity="0.9"/></svg>
+    <svg width="60" height="60" viewBox="0 0 60 60"><rect x="7" y="7" width="46" height="46" rx="4" fill="#f5a623" opacity="0.9"/></svg>
+    <svg width="60" height="60" viewBox="0 0 60 60"><polygon points="30,4 56,56 4,56" fill="#43e97b" opacity="0.9"/></svg>
+    <svg width="60" height="60" viewBox="0 0 60 60"><polygon points="14,56 46,56 54,10 6,10" fill="#38b2f9" opacity="0.9"/></svg>
+    <svg width="60" height="60" viewBox="0 0 60 60">
+      <ellipse cx="30" cy="18" rx="20" ry="10" fill="#b57bee" opacity="0.9"/>
+      <rect x="10" y="18" width="40" height="26" fill="#9b59e0" opacity="0.9"/>
+      <ellipse cx="30" cy="44" rx="20" ry="10" fill="#7d3bc8" opacity="0.9"/>
+    </svg>
+    <svg width="60" height="60" viewBox="0 0 60 60"><polygon points="30,4 56,30 44,56 16,56 4,30" fill="#f97b38" opacity="0.9"/></svg>
+  </div>
+  <p>畫面中有 <strong>10 個形狀</strong>，<br>請把每個形狀拖曳到正確的分類框中！<br>完成後按下「送出答案」查看結果。</p>
+  <button class="btn-start" onclick="startGame()">開始遊戲</button>
+</div>
+
+<!-- ════ 遊戲畫面 ════ -->
+<div id="screen-game" class="screen">
+  <div class="game-header">
+    <div class="game-title">🔷 形狀分類挑戰</div>
+    <div class="progress-info" id="progress-text">已分類：0 / 10</div>
+  </div>
+
+  <!-- 待分類形狀 -->
+  <div class="items-panel" id="items-panel">
+    <div class="items-panel-label">— 待分類形狀，請拖曳到下方框格 —</div>
+  </div>
+
+  <!-- 分類框 -->
+  <div class="drop-zones" id="drop-zones"></div>
+
+  <button class="btn-submit" id="btn-submit" disabled onclick="submitAnswer()">送出答案</button>
+</div>
+
+<!-- ════ 結果畫面 ════ -->
+<div id="screen-result" class="screen">
+  <div class="result-score-big" id="result-score"></div>
+  <div class="result-subtitle" id="result-subtitle"></div>
+  <div class="result-list" id="result-list"></div>
+  <div class="result-msg" id="result-msg"></div>
+  <button class="btn-restart" onclick="restartGame()">再玩一次</button>
+</div>
+
+<script>
+// ════════════════════════════════════════════
+// 資料定義
+// ════════════════════════════════════════════
+
+const CATEGORIES = [
+  { id: 'round',    label: '圓形類',  color: '#e94560' },
+  { id: 'angular',  label: '角形類',  color: '#f5a623' },
+  { id: 'three',    label: '三角形類', color: '#43e97b' },
+  { id: 'cylinder', label: '柱體類',  color: '#b57bee' },
+  { id: 'poly',     label: '多邊形類', color: '#38b2f9' },
+];
+
+// SVG 產生器，回傳 <svg>...</svg> 字串
+const SHAPES = [
+  {
+    id: 's1', name: '圓形', category: 'round',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" fill="#e94560"/></svg>`
+  },
+  {
+    id: 's2', name: '橢圓形', category: 'round',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60"><ellipse cx="30" cy="30" rx="28" ry="18" fill="#ff8fa0"/></svg>`
+  },
+  {
+    id: 's3', name: '正方形', category: 'angular',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60"><rect x="7" y="7" width="46" height="46" rx="3" fill="#f5a623"/></svg>`
+  },
+  {
+    id: 's4', name: '長方形', category: 'angular',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60"><rect x="4" y="14" width="52" height="32" rx="3" fill="#ffc34d"/></svg>`
+  },
+  {
+    id: 's5', name: '等腰三角形', category: 'three',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60"><polygon points="30,4 56,56 4,56" fill="#43e97b"/></svg>`
+  },
+  {
+    id: 's6', name: '直角三角形', category: 'three',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60"><polygon points="6,54 54,54 6,6" fill="#a8f0c8"/></svg>`
+  },
+  {
+    id: 's7', name: '圓柱體', category: 'cylinder',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60">
+      <ellipse cx="30" cy="16" rx="22" ry="11" fill="#b57bee"/>
+      <rect x="8" y="16" width="44" height="28" fill="#9b59e0"/>
+      <ellipse cx="30" cy="44" rx="22" ry="11" fill="#7d3bc8"/>
+    </svg>`
+  },
+  {
+    id: 's8', name: '梯形', category: 'angular',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60"><polygon points="14,56 46,56 54,10 6,10" fill="#38b2f9"/></svg>`
+  },
+  {
+    id: 's9', name: '五邊形', category: 'poly',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60"><polygon points="30,4 56,22 47,54 13,54 4,22" fill="#f97b38"/></svg>`
+  },
+  {
+    id: 's10', name: '六邊形', category: 'poly',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60"><polygon points="30,4 54,17 54,43 30,56 6,43 6,17" fill="#ffd766"/></svg>`
+  },
+];
+
+// ════════════════════════════════════════════
+// 遊戲狀態
+// ════════════════════════════════════════════
+let placement = {};   // { shapeId: categoryId }
+let shuffled  = [];
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ════════════════════════════════════════════
+// 畫面切換
+// ════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ════════════════════════════════════════════
+// 開始遊戲
+// ════════════════════════════════════════════
+function startGame() {
+  placement = {};
+  shuffled  = shuffle(SHAPES);
+  buildGameScreen();
+  showScreen('screen-game');
+}
+
+function buildGameScreen() {
+  const panel = document.getElementById('items-panel');
+  panel.innerHTML = '<div class="items-panel-label">— 待分類形狀，請拖曳到下方框格 —</div>';
+
+  shuffled.forEach(shape => {
+    panel.appendChild(createShapeEl(shape));
+  });
+
+  // 分類框
+  const zonesEl = document.getElementById('drop-zones');
+  zonesEl.innerHTML = '';
+  CATEGORIES.forEach(cat => {
+    const zone = document.createElement('div');
+    zone.className = 'drop-zone';
+    zone.dataset.catId = cat.id;
+    zone.style.borderColor = cat.color + '55';
+    zone.innerHTML = `
+      <div class="zone-label" style="background:${cat.color}33;color:${cat.color}">${cat.label}</div>
+      <div class="zone-content" id="zone-${cat.id}"></div>
+    `;
+    addDropZoneEvents(zone);
+    zonesEl.appendChild(zone);
+  });
+
+  updateProgress();
+}
+
+function createShapeEl(shape) {
+  const el = document.createElement('div');
+  el.className = 'shape-item';
+  el.dataset.shapeId = shape.id;
+  el.innerHTML = shape.svg;
+  el.title = shape.name;
+  addDragEvents(el);
+  return el;
+}
+
+// ════════════════════════════════════════════
+// 進度
+// ════════════════════════════════════════════
+function updateProgress() {
+  const count = Object.keys(placement).length;
+  document.getElementById('progress-text').textContent = `已分類：${count} / ${SHAPES.length}`;
+  document.getElementById('btn-submit').disabled = count < SHAPES.length;
+}
+
+// ════════════════════════════════════════════
+// Drag & Drop（滑鼠 + 觸控統一用自製方案）
+// ════════════════════════════════════════════
+let draggingId   = null;
+let dragOriginEl = null;   // 原本在哪個容器
+let ghost        = document.getElementById('drag-ghost');
+
+function addDragEvents(el) {
+  // 滑鼠
+  el.addEventListener('mousedown',  onPointerDown);
+  // 觸控
+  el.addEventListener('touchstart', onTouchStart, { passive: false });
+}
+
+// ─ 滑鼠 ─
+function onPointerDown(e) {
+  if (e.button !== 0) return;
+  startDrag(e.currentTarget, e.clientX, e.clientY);
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup',   onMouseUp);
+}
+function onMouseMove(e) { moveGhost(e.clientX, e.clientY); }
+function onMouseUp(e) {
+  document.removeEventListener('mousemove', onMouseMove);
+  document.removeEventListener('mouseup',   onMouseUp);
+  endDrag(e.clientX, e.clientY);
+}
+
+// ─ 觸控 ─
+function onTouchStart(e) {
+  e.preventDefault();
+  const t = e.touches[0];
+  startDrag(e.currentTarget, t.clientX, t.clientY);
+  document.addEventListener('touchmove', onTouchMove, { passive: false });
+  document.addEventListener('touchend',  onTouchEnd);
+}
+function onTouchMove(e) {
+  e.preventDefault();
+  const t = e.touches[0];
+  moveGhost(t.clientX, t.clientY);
+}
+function onTouchEnd(e) {
+  document.removeEventListener('touchmove', onTouchMove);
+  document.removeEventListener('touchend',  onTouchEnd);
+  const t = e.changedTouches[0];
+  endDrag(t.clientX, t.clientY);
+}
+
+// ─ 通用 ─
+function startDrag(el, cx, cy) {
+  draggingId   = el.dataset.shapeId;
+  dragOriginEl = el.parentElement;
+  el.classList.add('dragging');
+  ghost.innerHTML = el.outerHTML;
+  ghost.style.display = 'block';
+  moveGhost(cx, cy);
+}
+
+function moveGhost(cx, cy) {
+  ghost.style.left = (cx - 40) + 'px';
+  ghost.style.top  = (cy - 40) + 'px';
+}
+
+function endDrag(cx, cy) {
+  ghost.style.display = 'none';
+
+  // 找落點是哪個 drop-zone
+  const el = document.querySelector(`.shape-item[data-shape-id="${draggingId}"]`);
+  if (el) el.classList.remove('dragging');
+
+  const target = findDropZone(cx, cy);
+  if (target) {
+    const catId   = target.dataset.catId;
+    const content = target.querySelector('.zone-content');
+
+    // 若之前已放在某個框，先移回（同框也允許重複放）
+    removeFromZones(draggingId);
+
+    // 移入新框
+    const newEl = createShapeEl(SHAPES.find(s => s.id === draggingId));
+    content.appendChild(newEl);
+
+    // 若還在 panel 上，移除
+    const panelEl = document.querySelector(`#items-panel .shape-item[data-shape-id="${draggingId}"]`);
+    if (panelEl) panelEl.remove();
+
+    placement[draggingId] = catId;
+  }
+
+  draggingId   = null;
+  dragOriginEl = null;
+  updateProgress();
+  clearDragOver();
+}
+
+function findDropZone(cx, cy) {
+  const zones = document.querySelectorAll('.drop-zone');
+  for (const z of zones) {
+    const r = z.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return z;
+  }
+  return null;
+}
+
+function removeFromZones(shapeId) {
+  document.querySelectorAll('.drop-zone .shape-item').forEach(el => {
+    if (el.dataset.shapeId === shapeId) el.remove();
+  });
+  delete placement[shapeId];
+}
+
+function addDropZoneEvents(zone) {
+  // 只用來做視覺 hover 效果（實際放置在 endDrag 裡判斷）
+  zone.addEventListener('mouseover', () => zone.classList.add('drag-over'));
+  zone.addEventListener('mouseleave', () => zone.classList.remove('drag-over'));
+}
+function clearDragOver() {
+  document.querySelectorAll('.drop-zone.drag-over').forEach(z => z.classList.remove('drag-over'));
+}
+
+// ════════════════════════════════════════════
+// 送出答案
+// ════════════════════════════════════════════
+function submitAnswer() {
+  let correct = 0;
+  const rows  = [];
+
+  SHAPES.forEach(shape => {
+    const userCat   = placement[shape.id] || null;
+    const isCorrect = userCat === shape.category;
+    if (isCorrect) correct++;
+
+    const catLabel  = CATEGORIES.find(c => c.id === shape.category)?.label || '?';
+    const userLabel = CATEGORIES.find(c => c.id === userCat)?.label || '未放置';
+
+    rows.push({ shape, isCorrect, catLabel, userLabel });
+  });
+
+  buildResultScreen(correct, rows);
+  showScreen('screen-result');
+}
+
+function buildResultScreen(correct, rows) {
+  const total = SHAPES.length;
+  const pct   = Math.round(correct / total * 100);
+
+  document.getElementById('result-score').textContent = `${correct} / ${total}`;
+  document.getElementById('result-subtitle').textContent =
+    pct === 100 ? '🎉 全部答對，太厲害了！' :
+    pct >= 70   ? '👍 答對大部分，很不錯！' :
+    pct >= 40   ? '💪 還有進步空間，再試一次！' :
+                  '🔍 形狀有點難，多看幾次吧！';
+
+  const list = document.getElementById('result-list');
+  list.innerHTML = '';
+  rows.forEach(r => {
+    const div = document.createElement('div');
+    div.className = `result-row ${r.isCorrect ? 'correct' : 'wrong'}`;
+    div.innerHTML = `
+      <span class="icon">${r.isCorrect ? '✅' : '❌'}</span>
+      <div style="display:flex;align-items:center;gap:8px;flex:1">
+        ${r.shape.svg.replace('width="56"','width="36"').replace('height="56"','height="36"')}
+        <span class="shape-name">${r.shape.name}</span>
+      </div>
+      <div class="answer-text">
+        ${r.isCorrect
+          ? `正確：${r.catLabel}`
+          : `你選：${r.userLabel}<br>正確：${r.catLabel}`
+        }
+      </div>
+    `;
+    list.appendChild(div);
+  });
+
+  const msgs = [
+    pct === 100 ? '你對每個形狀都瞭若指掌，可以當形狀大師了！' :
+    pct >= 70   ? '大部分形狀都認識，有幾個稍微混淆了，再加油！' :
+    pct >= 40   ? '有些形狀很像，容易搞混，多觀察它們的特徵吧！' :
+                  '沒關係，形狀分類需要多練習，再試一次吧！'
+  ];
+  document.getElementById('result-msg').textContent = msgs[0];
+}
+
+// ════════════════════════════════════════════
+// 重新開始
+// ════════════════════════════════════════════
+function restartGame() {
+  showScreen('screen-start');
+}
+</script>
+</body>
+</html>
