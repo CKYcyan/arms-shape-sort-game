@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>形狀分類小遊戲</title>
+  <title>形狀分類小遊戲 v2</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -153,7 +153,7 @@
 
 <!-- ════ 開場畫面 ════ -->
 <div id="screen-start" class="screen active">
-  <h1>形狀分類挑戰</h1>
+  <h1>形狀分類挑戰 v2</h1>
   <div class="start-shapes">
     <!-- 預覽形狀 -->
     <svg width="60" height="60" viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" fill="#e94560" opacity="0.9"/></svg>
@@ -204,10 +204,10 @@
 // ════════════════════════════════════════════
 
 const CATEGORIES = [
-  { id: 'round',    label: '圓形類',  color: '#e94560' },
-  { id: 'angular',  label: '角形類',  color: '#f5a623' },
+  { id: 'round',    label: '圓形類',   color: '#e94560' },
+  { id: 'angular',  label: '四邊形類', color: '#f5a623' },
   { id: 'three',    label: '三角形類', color: '#43e97b' },
-  { id: 'cylinder', label: '柱體類',  color: '#b57bee' },
+  { id: 'cylinder', label: '柱體類',   color: '#b57bee' },
   { id: 'poly',     label: '多邊形類', color: '#38b2f9' },
 ];
 
