@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>海洋生物分類小遊戲 v3</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+      background: linear-gradient(160deg, #001f3f 0%, #003566 50%, #005f73 100%);
+      min-height: 100vh;
+      color: #fff;
+      overflow-x: hidden;
+    }
+
+    /* ── 畫面切換 ── */
+    .screen { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+    .screen.active { display: flex; }
+
+    /* ══ 開場畫面 ══ */
+    #screen-start { text-align: center; gap: 22px; }
+    #screen-start h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem); letter-spacing: 4px;
+      background: linear-gradient(90deg, #48cae4, #90e0ef, #48cae4);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    #screen-start .subtitle { font-size: 1rem; color: #90e0ef; letter-spacing: 2px; }
+    #screen-start p { font-size: clamp(0.95rem, 2.5vw, 1.15rem); color: #caf0f8; max-width: 500px; line-height: 1.9; }
+    .start-previews { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin: 4px 0; }
+    .start-previews svg { filter: drop-shadow(0 4px 14px rgba(72,202,228,0.45)); }
+    .btn-start {
+      padding: 15px 48px; font-size: 1.25rem; border: none; border-radius: 50px;
+      background: linear-gradient(90deg, #0077b6, #00b4d8);
+      color: #fff; cursor: pointer; letter-spacing: 2px; font-weight: bold;
+      box-shadow: 0 8px 28px rgba(0,119,182,0.5);
+      transition: transform .2s, box-shadow .2s;
+    }
+    .btn-start:hover { transform: scale(1.06); box-shadow: 0 12px 38px rgba(0,180,216,0.65); }
+
+    /* ══ 遊戲畫面 ══ */
+    #screen-game { justify-content: flex-start; padding: 16px 20px 24px; gap: 14px; }
+
+    .game-header { width: 100%; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+    .game-title { font-size: 1.25rem; font-weight: bold; color: #90e0ef; letter-spacing: 2px; }
+    .progress-info { font-size: 1rem; color: #48cae4; }
+
+    /* 待分類區 */
+    .items-panel {
+      width: 100%; background: rgba(0,180,216,0.05);
+      border: 2px dashed rgba(72,202,228,0.3);
+      border-radius: 20px; padding: 18px;
+      display: flex; flex-wrap: wrap; gap: 14px;
+      justify-content: center; align-items: flex-end;
+      min-height: 130px;
+    }
+    .items-panel-label { width: 100%; text-align: center; font-size: 0.85rem; color: rgba(255,255,255,0.35); margin-bottom: -6px; }
+
+    /* 分類框 */
+    .drop-zones { width: 100%; display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+    .drop-zone {
+      flex: 1 1 150px; max-width: 190px; min-height: 140px;
+      border: 3px dashed rgba(255,255,255,0.22);
+      border-radius: 18px; padding: 10px 8px 8px;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      transition: background .25s, border-color .25s, transform .15s;
+    }
+    .drop-zone .zone-label {
+      font-size: 0.9rem; font-weight: bold; letter-spacing: 1px;
+      padding: 4px 12px; border-radius: 50px;
+      background: rgba(255,255,255,0.1); color: #fff;
+      white-space: nowrap;
+    }
+    .drop-zone .zone-content { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+    .drop-zone.drag-over { background: rgba(72,202,228,0.1); border-color: #48cae4; transform: scale(1.03); }
+
+    /* 生物卡片 */
+    .shape-item {
+      width: 80px; height: 92px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 4px;
+      cursor: grab; border-radius: 14px;
+      background: rgba(255,255,255,0.07);
+      border: 2px solid rgba(255,255,255,0.14);
+      transition: transform .15s, box-shadow .15s;
+      touch-action: none;
+      user-select: none;
+    }
+    .shape-item:hover { transform: scale(1.1); box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
+    .shape-item.dragging { opacity: 0.35; transform: scale(0.95); }
+    .shape-item svg { pointer-events: none; }
+    .shape-item .shape-label {
+      font-size: 0.68rem; color: #90e0ef; text-align: center;
+      pointer-events: none; line-height: 1.2; padding: 0 4px;
+    }
+
+    /* 在分類框內縮小並隱藏名稱 */
+    .drop-zone .shape-item { width: 54px; height: 54px; }
+    .drop-zone .shape-item svg { width: 38px; height: 38px; }
+    .drop-zone .shape-item .shape-label { display: none; }
+
+    /* 送出按鈕 */
+    .btn-submit {
+      padding: 13px 40px; font-size: 1.1rem; border: none; border-radius: 50px;
+      background: linear-gradient(90deg, #43e97b, #38f9d7);
+      color: #001f3f; cursor: pointer; font-weight: bold; letter-spacing: 2px;
+      box-shadow: 0 6px 22px rgba(67,233,123,0.3);
+      transition: transform .2s, box-shadow .2s, opacity .2s;
+    }
+    .btn-submit:disabled { opacity: .38; cursor: not-allowed; transform: none; }
+    .btn-submit:not(:disabled):hover { transform: scale(1.05); box-shadow: 0 10px 28px rgba(67,233,123,0.5); }
+
+    /* ══ 結果畫面 ══ */
+    #screen-result { gap: 20px; padding: 32px 20px; }
+    .result-score-big {
+      font-size: clamp(4rem, 12vw, 6.5rem); font-weight: 900;
+      background: linear-gradient(90deg, #43e97b, #38f9d7);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      line-height: 1; text-align: center;
+    }
+    .result-subtitle { font-size: 1.25rem; color: #90e0ef; text-align: center; }
+    .result-list { width: 100%; max-width: 620px; display: flex; flex-direction: column; gap: 9px; }
+    .result-row {
+      display: flex; align-items: flex-start; gap: 12px;
+      background: rgba(255,255,255,0.06); border-radius: 14px;
+      padding: 10px 14px; border: 2px solid transparent;
+    }
+    .result-row.correct { border-color: #43e97b; }
+    .result-row.wrong   { border-color: #e94560; }
+    .result-row .r-icon { font-size: 1.2rem; padding-top: 3px; flex-shrink: 0; }
+    .result-row .r-svg  { flex-shrink: 0; }
+    .result-row .r-info { flex: 1; min-width: 0; }
+    .result-row .r-name { font-size: 0.95rem; font-weight: bold; }
+    .result-row .r-desc { font-size: 0.78rem; color: rgba(255,255,255,0.55); line-height: 1.55; margin-top: 3px; }
+    .result-row .r-ans  { font-size: 0.82rem; color: rgba(255,255,255,0.5); text-align: right; flex-shrink: 0; padding-top: 3px; }
+    .result-row.wrong .r-ans { color: #ff8fa0; }
+    .result-msg { font-size: 1rem; color: #48cae4; max-width: 440px; line-height: 1.75; text-align: center; }
+    .btn-restart {
+      padding: 13px 40px; font-size: 1.05rem; border: none; border-radius: 50px;
+      background: linear-gradient(90deg, #0077b6, #00b4d8);
+      color: #fff; cursor: pointer; font-weight: bold; letter-spacing: 2px;
+      transition: transform .2s;
+    }
+    .btn-restart:hover { transform: scale(1.05); }
+
+    /* ── ghost ── */
+    #drag-ghost {
+      position: fixed; pointer-events: none; z-index: 9999;
+      opacity: 0.88; transform: scale(1.12);
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<div id="drag-ghost"></div>
+
+<!-- ════ 開場畫面 ════ -->
+<div id="screen-start" class="screen active">
+  <h1>🌊 海洋生物分類挑戰</h1>
+  <div class="subtitle">Marine Life Sorting Challenge</div>
+  <div class="start-previews">
+    <!-- 魚類代表：小丑魚 -->
+    <svg width="58" height="58" viewBox="0 0 60 60">
+      <polygon points="50,30 59,19 59,41" fill="#d84315"/>
+      <ellipse cx="27" cy="30" rx="22" ry="14" fill="#ff7043"/>
+      <rect x="22" y="16" width="9" height="28" rx="4" fill="white" opacity="0.9"/>
+      <polygon points="17,18 27,6 37,18" fill="#ff5722"/>
+      <circle cx="10" cy="26" r="4" fill="white"/>
+      <circle cx="10" cy="26" r="2.5" fill="#1a1a1a"/>
+    </svg>
+    <!-- 甲殼類代表：螃蟹 -->
+    <svg width="58" height="58" viewBox="0 0 60 60">
+      <line x1="16" y1="36" x2="3" y2="28" stroke="#b71c1c" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="14" y1="40" x2="2" y2="40" stroke="#b71c1c" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="14" y1="44" x2="4" y2="52" stroke="#b71c1c" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="44" y1="36" x2="57" y2="28" stroke="#b71c1c" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="46" y1="40" x2="58" y2="40" stroke="#b71c1c" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="46" y1="44" x2="56" y2="52" stroke="#b71c1c" stroke-width="3.5" stroke-linecap="round"/>
+      <path d="M12,30 Q4,20 6,12" stroke="#c62828" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <ellipse cx="8" cy="9" rx="7" ry="5" fill="#c62828" transform="rotate(-30 8 9)"/>
+      <path d="M48,30 Q56,20 54,12" stroke="#c62828" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <ellipse cx="52" cy="9" rx="7" ry="5" fill="#c62828" transform="rotate(30 52 9)"/>
+      <ellipse cx="30" cy="38" rx="18" ry="13" fill="#e53935"/>
+      <line x1="24" y1="27" x2="22" y2="22" stroke="#e53935" stroke-width="2.5"/>
+      <circle cx="22" cy="20" r="4" fill="white"/><circle cx="22" cy="20" r="2.5" fill="#1a1a1a"/>
+      <line x1="36" y1="27" x2="38" y2="22" stroke="#e53935" stroke-width="2.5"/>
+      <circle cx="38" cy="20" r="4" fill="white"/><circle cx="38" cy="20" r="2.5" fill="#1a1a1a"/>
+    </svg>
+    <!-- 棘皮動物代表：海星 -->
+    <svg width="58" height="58" viewBox="0 0 60 60">
+      <polygon points="30,4 35,22 54,22 39,33 44,51 30,40 16,51 21,33 6,22 25,22" fill="#ff8f00"/>
+      <circle cx="30" cy="30" r="7" fill="#ffa000"/>
+    </svg>
+    <!-- 軟體動物代表：章魚 -->
+    <svg width="58" height="58" viewBox="0 0 60 60">
+      <path d="M14,38 Q6,48 8,57" stroke="#ba68c8" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M22,42 Q16,52 18,59" stroke="#ce93d8" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <path d="M30,44 Q28,54 26,59" stroke="#ba68c8" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <path d="M38,42 Q44,52 42,59" stroke="#ce93d8" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <path d="M46,38 Q54,48 52,57" stroke="#ba68c8" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <ellipse cx="30" cy="18" rx="20" ry="16" fill="#9c27b0"/>
+      <ellipse cx="30" cy="36" rx="18" ry="8" fill="#8e24aa"/>
+      <circle cx="22" cy="18" r="6" fill="white"/><circle cx="22" cy="18" r="4" fill="#1a1a1a"/><circle cx="22" cy="18" r="1.5" fill="white"/>
+      <circle cx="38" cy="18" r="6" fill="white"/><circle cx="38" cy="18" r="4" fill="#1a1a1a"/><circle cx="38" cy="18" r="1.5" fill="white"/>
+    </svg>
+  </div>
+  <p>畫面中有 <strong>12 種海洋生物</strong>，<br>請把牠們拖曳到正確的分類框中！<br>完成後按下「送出答案」，查看結果與介紹。</p>
+  <button class="btn-start" onclick="startGame()">開始遊戲</button>
+</div>
+
+<!-- ════ 遊戲畫面 ════ -->
+<div id="screen-game" class="screen">
+  <div class="game-header">
+    <div class="game-title">🌊 海洋生物分類挑戰</div>
+    <div class="progress-info" id="progress-text">已分類：0 / 12</div>
+  </div>
+  <div class="items-panel" id="items-panel">
+    <div class="items-panel-label">— 待分類生物，請拖曳到下方框格 —</div>
+  </div>
+  <div class="drop-zones" id="drop-zones"></div>
+  <button class="btn-submit" id="btn-submit" disabled onclick="submitAnswer()">送出答案</button>
+</div>
+
+<!-- ════ 結果畫面 ════ -->
+<div id="screen-result" class="screen">
+  <div class="result-score-big" id="result-score"></div>
+  <div class="result-subtitle" id="result-subtitle"></div>
+  <div class="result-list" id="result-list"></div>
+  <div class="result-msg" id="result-msg"></div>
+  <button class="btn-restart" onclick="restartGame()">再玩一次</button>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// 資料定義
+// ══════════════════════════════════════════════
+
+const CATEGORIES = [
+  { id: 'fish',       label: '🐟 魚類',     color: '#29b6f6' },
+  { id: 'crustacean', label: '🦀 甲殼類',   color: '#ef5350' },
+  { id: 'echinoderm', label: '⭐ 棘皮動物', color: '#ab47bc' },
+  { id: 'mollusc',    label: '🐙 軟體動物', color: '#26a69a' },
+];
+
+const SHAPES = [
+  // ── 魚類 ──
+  {
+    id: 's1', name: '小丑魚', category: 'fish',
+    desc: '體色橙紅、有白色環紋，常與海葵共生，是最受歡迎的珊瑚礁魚類之一。',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60">
+      <polygon points="50,30 59,19 59,41" fill="#d84315"/>
+      <ellipse cx="27" cy="30" rx="22" ry="14" fill="#ff7043"/>
+      <rect x="22" y="16" width="9" height="28" rx="4" fill="white" opacity="0.9"/>
+      <polygon points="17,18 27,6 37,18" fill="#ff5722"/>
+      <circle cx="10" cy="26" r="4" fill="white"/>
+      <circle cx="10" cy="26" r="2.5" fill="#1a1a1a"/>
+    </svg>`
+  },
+  {
+    id: 's2', name: '鯊魚', category: 'fish',
+    desc: '海洋頂級掠食者，軟骨魚類，感官極為靈敏，是維持生態平衡的關鍵物種。',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60">
+      <polygon points="53,30 59,16 59,44" fill="#546e7a"/>
+      <ellipse cx="26" cy="36" rx="24" ry="12" fill="#78909c"/>
+      <ellipse cx="26" cy="40" rx="18" ry="7" fill="#cfd8dc"/>
+      <polygon points="22,25 28,10 34,25" fill="#607d8b"/>
+      <polygon points="14,36 6,50 24,40" fill="#607d8b"/>
+      <circle cx="7" cy="32" r="3.5" fill="white"/>
+      <circle cx="7" cy="32" r="2" fill="#1a1a1a"/>
+    </svg>`
+  },
+  {
+    id: 's3', name: '海馬', category: 'fish',
+    desc: '全身由骨板覆蓋，雄性負責孵育後代，是自然界中唯一由父親「懷孕」的動物。',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60">
+      <path d="M34,54 C14,52 16,40 30,34 C44,28 46,18 34,12"
+            stroke="#fdd835" stroke-width="10" fill="none" stroke-linecap="round"/>
+      <circle cx="34" cy="10" r="9" fill="#fdd835"/>
+      <ellipse cx="46" cy="6" rx="8" ry="3.5" fill="#fdd835"/>
+      <circle cx="41" cy="6" r="2.5" fill="#1a1a1a"/>
+      <line x1="30" y1="3" x2="28" y2="2" stroke="#f57f17" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="34" y1="2" x2="34" y2="1" stroke="#f57f17" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="38" y1="3" x2="40" y2="2" stroke="#f57f17" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M44,24 Q52,28 44,32" stroke="#f57f17" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    </svg>`
+  },
+
+  // ── 甲殼類 ──
+  {
+    id: 's4', name: '螃蟹', category: 'crustacean',
+    desc: '十足目甲殼動物，擁有堅硬外殼與一對大螯，橫向行走是其最大特徵。',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60">
+      <line x1="16" y1="36" x2="3" y2="28" stroke="#b71c1c" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="14" y1="40" x2="2" y2="40" stroke="#b71c1c" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="14" y1="44" x2="4" y2="52" stroke="#b71c1c" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="44" y1="36" x2="57" y2="28" stroke="#b71c1c" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="46" y1="40" x2="58" y2="40" stroke="#b71c1c" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="46" y1="44" x2="56" y2="52" stroke="#b71c1c" stroke-width="3.5" stroke-linecap="round"/>
+      <path d="M12,30 Q4,20 6,12" stroke="#c62828" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <ellipse cx="8" cy="9" rx="7" ry="5" fill="#c62828" transform="rotate(-30 8 9)"/>
+      <path d="M48,30 Q56,20 54,12" stroke="#c62828" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <ellipse cx="52" cy="9" rx="7" ry="5" fill="#c62828" transform="rotate(30 52 9)"/>
+      <ellipse cx="30" cy="38" rx="18" ry="13" fill="#e53935"/>
+      <line x1="24" y1="27" x2="22" y2="22" stroke="#e53935" stroke-width="2.5"/>
+      <circle cx="22" cy="20" r="4" fill="white"/><circle cx="22" cy="20" r="2.5" fill="#1a1a1a"/>
+      <line x1="36" y1="27" x2="38" y2="22" stroke="#e53935" stroke-width="2.5"/>
+      <circle cx="38" cy="20" r="4" fill="white"/><circle cx="38" cy="20" r="2.5" fill="#1a1a1a"/>
+    </svg>`
+  },
+  {
+    id: 's5', name: '蝦子', category: 'crustacean',
+    desc: '長觸鬚、半透明身體，廣泛分布於海洋與淡水，是全球重要的漁業資源。',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60">
+      <path d="M50,10 C58,22 54,36 44,44 C32,52 18,54 10,50"
+            stroke="#f48fb1" stroke-width="9" fill="none" stroke-linecap="round"/>
+      <circle cx="49" cy="10" r="8" fill="#e91e63"/>
+      <line x1="54" y1="4" x2="59" y2="1" stroke="#e91e63" stroke-width="2" stroke-linecap="round"/>
+      <line x1="50" y1="3" x2="52" y2="1" stroke="#e91e63" stroke-width="2" stroke-linecap="round"/>
+      <polygon points="10,50 2,43 8,56" fill="#e91e63"/>
+      <polygon points="10,50 4,54 10,59" fill="#f48fb1"/>
+      <circle cx="54" cy="8" r="3" fill="#1a1a1a"/>
+      <line x1="38" y1="40" x2="34" y2="48" stroke="#f48fb1" stroke-width="2" stroke-linecap="round"/>
+      <line x1="30" y1="46" x2="26" y2="54" stroke="#f48fb1" stroke-width="2" stroke-linecap="round"/>
+    </svg>`
+  },
+  {
+    id: 's6', name: '龍蝦', category: 'crustacean',
+    desc: '大型甲殼動物，擁有強壯的大螯與長觸鬚，夜行性，喜藏身於礁石縫隙中。',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60">
+      <ellipse cx="30" cy="52" rx="8" ry="5" fill="#b71c1c"/>
+      <polygon points="24,54 16,59 22,49" fill="#c62828"/>
+      <polygon points="36,54 44,59 38,49" fill="#c62828"/>
+      <ellipse cx="30" cy="38" rx="11" ry="14" fill="#d32f2f"/>
+      <ellipse cx="30" cy="20" rx="10" ry="8" fill="#e53935"/>
+      <path d="M20,26 Q10,20 8,12" stroke="#c62828" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <ellipse cx="8" cy="9" rx="7" ry="5" fill="#c62828"/>
+      <path d="M40,26 Q50,20 52,12" stroke="#c62828" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <ellipse cx="52" cy="9" rx="7" ry="5" fill="#c62828"/>
+      <line x1="26" y1="13" x2="8" y2="4" stroke="#b71c1c" stroke-width="2" stroke-linecap="round"/>
+      <line x1="34" y1="13" x2="52" y2="4" stroke="#b71c1c" stroke-width="2" stroke-linecap="round"/>
+      <line x1="20" y1="38" x2="8" y2="34" stroke="#c62828" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="20" y1="42" x2="6" y2="42" stroke="#c62828" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="40" y1="38" x2="52" y2="34" stroke="#c62828" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="40" y1="42" x2="54" y2="42" stroke="#c62828" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="24" cy="14" r="3.5" fill="white"/><circle cx="24" cy="14" r="2" fill="#1a1a1a"/>
+      <circle cx="36" cy="14" r="3.5" fill="white"/><circle cx="36" cy="14" r="2" fill="#1a1a1a"/>
+    </svg>`
+  },
+
+  // ── 棘皮動物 ──
+  {
+    id: 's7', name: '海星', category: 'echinoderm',
+    desc: '具有五輻射對稱的身體，靠管足緩慢移動與捕食，斷掉的腕足能夠再生。',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60">
+      <polygon points="30,4 35,22 54,22 39,33 44,51 30,40 16,51 21,33 6,22 25,22" fill="#ff8f00"/>
+      <circle cx="30" cy="30" r="7" fill="#ffa000"/>
+      <circle cx="30" cy="13" r="2.5" fill="#ff6f00"/>
+      <circle cx="45" cy="42" r="2" fill="#ff6f00"/>
+      <circle cx="18" cy="45" r="2" fill="#ff6f00"/>
+    </svg>`
+  },
+  {
+    id: 's8', name: '海膽', category: 'echinoderm',
+    desc: '全身布滿長棘，棘刺兼具防禦與移動功能，生殖腺（海膽黃）常作為珍貴食材。',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60">
+      <line x1="30" y1="16" x2="30" y2="4"  stroke="#7b1fa2" stroke-width="3" stroke-linecap="round"/>
+      <line x1="41" y1="19" x2="48" y2="10" stroke="#7b1fa2" stroke-width="3" stroke-linecap="round"/>
+      <line x1="47" y1="29" x2="57" y2="27" stroke="#7b1fa2" stroke-width="3" stroke-linecap="round"/>
+      <line x1="44" y1="40" x2="52" y2="47" stroke="#7b1fa2" stroke-width="3" stroke-linecap="round"/>
+      <line x1="37" y1="47" x2="41" y2="56" stroke="#7b1fa2" stroke-width="3" stroke-linecap="round"/>
+      <line x1="30" y1="48" x2="30" y2="57" stroke="#7b1fa2" stroke-width="3" stroke-linecap="round"/>
+      <line x1="23" y1="47" x2="19" y2="56" stroke="#7b1fa2" stroke-width="3" stroke-linecap="round"/>
+      <line x1="16" y1="40" x2="8"  y2="47" stroke="#7b1fa2" stroke-width="3" stroke-linecap="round"/>
+      <line x1="13" y1="29" x2="3"  y2="27" stroke="#7b1fa2" stroke-width="3" stroke-linecap="round"/>
+      <line x1="19" y1="19" x2="12" y2="10" stroke="#7b1fa2" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="30" cy="32" r="16" fill="#9c27b0"/>
+      <circle cx="30" cy="32" r="9"  fill="#ab47bc" opacity="0.6"/>
+    </svg>`
+  },
+  {
+    id: 's9', name: '海參', category: 'echinoderm',
+    desc: '體軟無骨，受驚時會排出內臟嚇退天敵，之後能自行再生，是海底的清道夫。',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60">
+      <ellipse cx="30" cy="34" rx="26" ry="11" fill="#6d4c41" transform="rotate(-8 30 34)"/>
+      <circle cx="16" cy="26" r="4.5" fill="#5d4037"/>
+      <circle cx="24" cy="23" r="4.5" fill="#5d4037"/>
+      <circle cx="32" cy="22" r="4.5" fill="#5d4037"/>
+      <circle cx="40" cy="24" r="4.5" fill="#5d4037"/>
+      <line x1="8"  y1="32" x2="3"  y2="27" stroke="#4e342e" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="7"  y1="34" x2="2"  y2="34" stroke="#4e342e" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="8"  y1="36" x2="3"  y2="41" stroke="#4e342e" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>`
+  },
+
+  // ── 軟體動物 ──
+  {
+    id: 's10', name: '章魚', category: 'mollusc',
+    desc: '高智商無脊椎動物，擁有八條觸腕，能瞬間改變體色與體形，是偽裝大師。',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60">
+      <path d="M14,38 Q6,48 8,57"  stroke="#ba68c8" stroke-width="5"   fill="none" stroke-linecap="round"/>
+      <path d="M22,42 Q16,52 18,59" stroke="#ce93d8" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <path d="M30,44 Q28,54 26,59" stroke="#ba68c8" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <path d="M38,42 Q44,52 42,59" stroke="#ce93d8" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <path d="M46,38 Q54,48 52,57" stroke="#ba68c8" stroke-width="5"   fill="none" stroke-linecap="round"/>
+      <ellipse cx="30" cy="18" rx="20" ry="16" fill="#9c27b0"/>
+      <ellipse cx="30" cy="36" rx="18" ry="8"  fill="#8e24aa"/>
+      <circle cx="22" cy="18" r="6" fill="white"/><circle cx="22" cy="18" r="4" fill="#1a1a1a"/><circle cx="22" cy="18" r="1.5" fill="white"/>
+      <circle cx="38" cy="18" r="6" fill="white"/><circle cx="38" cy="18" r="4" fill="#1a1a1a"/><circle cx="38" cy="18" r="1.5" fill="white"/>
+    </svg>`
+  },
+  {
+    id: 's11', name: '烏賊', category: 'mollusc',
+    desc: '能噴墨汁逃脫天敵，具有獨特的 W 形瞳孔，游泳時靠體側的鰭波動前進。',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60">
+      <line x1="22" y1="52" x2="16" y2="59" stroke="#80cbc4" stroke-width="3" stroke-linecap="round"/>
+      <line x1="26" y1="54" x2="22" y2="59" stroke="#4db6ac" stroke-width="3" stroke-linecap="round"/>
+      <line x1="30" y1="55" x2="30" y2="59" stroke="#80cbc4" stroke-width="3" stroke-linecap="round"/>
+      <line x1="34" y1="54" x2="38" y2="59" stroke="#4db6ac" stroke-width="3" stroke-linecap="round"/>
+      <line x1="38" y1="52" x2="44" y2="59" stroke="#80cbc4" stroke-width="3" stroke-linecap="round"/>
+      <line x1="24" y1="52" x2="14" y2="59" stroke="#26a69a" stroke-width="4" stroke-linecap="round"/>
+      <line x1="36" y1="52" x2="46" y2="59" stroke="#26a69a" stroke-width="4" stroke-linecap="round"/>
+      <ellipse cx="30" cy="32" rx="13" ry="22" fill="#4dd0e1"/>
+      <polygon points="17,16 8,8 22,22"  fill="#00bcd4"/>
+      <polygon points="43,16 52,8 38,22" fill="#00bcd4"/>
+      <ellipse cx="30" cy="52" rx="9" ry="5" fill="#26c6da"/>
+      <circle cx="22" cy="30" r="4" fill="white"/><circle cx="22" cy="30" r="2.5" fill="#1a1a1a"/>
+      <circle cx="38" cy="30" r="4" fill="white"/><circle cx="38" cy="30" r="2.5" fill="#1a1a1a"/>
+      <polygon points="30,10 26,16 34,16" fill="#00acc1"/>
+    </svg>`
+  },
+  {
+    id: 's12', name: '蛤蜊', category: 'mollusc',
+    desc: '雙殼貝類，靠水管過濾海水中的浮游生物為食，是潮間帶最常見的貝類之一。',
+    svg: `<svg width="56" height="56" viewBox="0 0 60 60">
+      <path d="M6,34 Q6,56 30,56 Q54,56 54,34 Z" fill="#a1887f"/>
+      <path d="M6,34 Q6,12 30,10 Q54,12 54,34 Z" fill="#d7ccc8"/>
+      <path d="M30,10 Q18,20 8,34"  stroke="#bcaaa4" stroke-width="1.5" fill="none"/>
+      <path d="M30,10 Q24,22 22,34" stroke="#bcaaa4" stroke-width="1.5" fill="none"/>
+      <path d="M30,10 Q30,24 30,34" stroke="#bcaaa4" stroke-width="1.5" fill="none"/>
+      <path d="M30,10 Q36,22 38,34" stroke="#bcaaa4" stroke-width="1.5" fill="none"/>
+      <path d="M30,10 Q42,20 52,34" stroke="#bcaaa4" stroke-width="1.5" fill="none"/>
+      <circle cx="30" cy="10" r="4" fill="#8d6e63"/>
+      <rect x="6" y="32" width="48" height="4" rx="2" fill="#ffe082"/>
+      <ellipse cx="30" cy="36" rx="6" ry="3.5" fill="white" opacity="0.7"/>
+    </svg>`
+  },
+];
+
+// ══════════════════════════════════════════════
+// 遊戲狀態
+// ══════════════════════════════════════════════
+let placement = {};
+let shuffled  = [];
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ══════════════════════════════════════════════
+// 畫面切換
+// ══════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ══════════════════════════════════════════════
+// 開始遊戲
+// ══════════════════════════════════════════════
+function startGame() {
+  placement = {};
+  shuffled  = shuffle(SHAPES);
+  buildGameScreen();
+  showScreen('screen-game');
+}
+
+function buildGameScreen() {
+  const panel = document.getElementById('items-panel');
+  panel.innerHTML = '<div class="items-panel-label">— 待分類生物，請拖曳到下方框格 —</div>';
+  shuffled.forEach(shape => panel.appendChild(createShapeEl(shape)));
+
+  const zonesEl = document.getElementById('drop-zones');
+  zonesEl.innerHTML = '';
+  CATEGORIES.forEach(cat => {
+    const zone = document.createElement('div');
+    zone.className = 'drop-zone';
+    zone.dataset.catId = cat.id;
+    zone.style.borderColor = cat.color + '55';
+    zone.innerHTML = `
+      <div class="zone-label" style="background:${cat.color}33;color:${cat.color}">${cat.label}</div>
+      <div class="zone-content" id="zone-${cat.id}"></div>
+    `;
+    addDropZoneEvents(zone);
+    zonesEl.appendChild(zone);
+  });
+
+  updateProgress();
+}
+
+function createShapeEl(shape) {
+  const el = document.createElement('div');
+  el.className = 'shape-item';
+  el.dataset.shapeId = shape.id;
+  el.innerHTML = shape.svg + `<span class="shape-label">${shape.name}</span>`;
+  el.title = shape.name;
+  addDragEvents(el);
+  return el;
+}
+
+// ══════════════════════════════════════════════
+// 進度
+// ══════════════════════════════════════════════
+function updateProgress() {
+  const count = Object.keys(placement).length;
+  document.getElementById('progress-text').textContent = `已分類：${count} / ${SHAPES.length}`;
+  document.getElementById('btn-submit').disabled = count < SHAPES.length;
+}
+
+// ══════════════════════════════════════════════
+// Drag & Drop（滑鼠 + 觸控統一方案）
+// ══════════════════════════════════════════════
+let draggingId   = null;
+let dragOriginEl = null;
+let ghost        = document.getElementById('drag-ghost');
+
+function addDragEvents(el) {
+  el.addEventListener('mousedown',  onPointerDown);
+  el.addEventListener('touchstart', onTouchStart, { passive: false });
+}
+
+function onPointerDown(e) {
+  if (e.button !== 0) return;
+  startDrag(e.currentTarget, e.clientX, e.clientY);
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup',   onMouseUp);
+}
+function onMouseMove(e) { moveGhost(e.clientX, e.clientY); }
+function onMouseUp(e) {
+  document.removeEventListener('mousemove', onMouseMove);
+  document.removeEventListener('mouseup',   onMouseUp);
+  endDrag(e.clientX, e.clientY);
+}
+
+function onTouchStart(e) {
+  e.preventDefault();
+  const t = e.touches[0];
+  startDrag(e.currentTarget, t.clientX, t.clientY);
+  document.addEventListener('touchmove', onTouchMove, { passive: false });
+  document.addEventListener('touchend',  onTouchEnd);
+}
+function onTouchMove(e) {
+  e.preventDefault();
+  const t = e.touches[0];
+  moveGhost(t.clientX, t.clientY);
+}
+function onTouchEnd(e) {
+  document.removeEventListener('touchmove', onTouchMove);
+  document.removeEventListener('touchend',  onTouchEnd);
+  const t = e.changedTouches[0];
+  endDrag(t.clientX, t.clientY);
+}
+
+function startDrag(el, cx, cy) {
+  draggingId   = el.dataset.shapeId;
+  dragOriginEl = el.parentElement;
+  el.classList.add('dragging');
+  ghost.innerHTML = el.outerHTML;
+  ghost.style.display = 'block';
+  moveGhost(cx, cy);
+}
+function moveGhost(cx, cy) {
+  ghost.style.left = (cx - 40) + 'px';
+  ghost.style.top  = (cy - 40) + 'px';
+}
+function endDrag(cx, cy) {
+  ghost.style.display = 'none';
+  const el = document.querySelector(`.shape-item[data-shape-id="${draggingId}"]`);
+  if (el) el.classList.remove('dragging');
+
+  const target = findDropZone(cx, cy);
+  if (target) {
+    const catId   = target.dataset.catId;
+    const content = target.querySelector('.zone-content');
+    removeFromZones(draggingId);
+    const newEl = createShapeEl(SHAPES.find(s => s.id === draggingId));
+    content.appendChild(newEl);
+    const panelEl = document.querySelector(`#items-panel .shape-item[data-shape-id="${draggingId}"]`);
+    if (panelEl) panelEl.remove();
+    placement[draggingId] = catId;
+  }
+
+  draggingId   = null;
+  dragOriginEl = null;
+  updateProgress();
+  clearDragOver();
+}
+
+function findDropZone(cx, cy) {
+  for (const z of document.querySelectorAll('.drop-zone')) {
+    const r = z.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return z;
+  }
+  return null;
+}
+function removeFromZones(shapeId) {
+  document.querySelectorAll('.drop-zone .shape-item').forEach(el => {
+    if (el.dataset.shapeId === shapeId) el.remove();
+  });
+  delete placement[shapeId];
+}
+function addDropZoneEvents(zone) {
+  zone.addEventListener('mouseover',  () => zone.classList.add('drag-over'));
+  zone.addEventListener('mouseleave', () => zone.classList.remove('drag-over'));
+}
+function clearDragOver() {
+  document.querySelectorAll('.drop-zone.drag-over').forEach(z => z.classList.remove('drag-over'));
+}
+
+// ══════════════════════════════════════════════
+// 送出答案
+// ══════════════════════════════════════════════
+function submitAnswer() {
+  let correct = 0;
+  const rows  = [];
+  SHAPES.forEach(shape => {
+    const userCat   = placement[shape.id] || null;
+    const isCorrect = userCat === shape.category;
+    if (isCorrect) correct++;
+    const catLabel  = CATEGORIES.find(c => c.id === shape.category)?.label || '?';
+    const userLabel = CATEGORIES.find(c => c.id === userCat)?.label || '未放置';
+    rows.push({ shape, isCorrect, catLabel, userLabel });
+  });
+  buildResultScreen(correct, rows);
+  showScreen('screen-result');
+}
+
+function buildResultScreen(correct, rows) {
+  const total = SHAPES.length;
+  const pct   = Math.round(correct / total * 100);
+
+  document.getElementById('result-score').textContent = `${correct} / ${total}`;
+  document.getElementById('result-subtitle').textContent =
+    pct === 100 ? '🎉 全部答對，你是海洋生物專家！' :
+    pct >= 70   ? '👍 答對大部分，非常厲害！' :
+    pct >= 40   ? '💪 還有進步空間，再試一次！' :
+                  '🔍 海洋生物好多元，多觀察幾次吧！';
+
+  const list = document.getElementById('result-list');
+  list.innerHTML = '';
+  rows.forEach(r => {
+    const div = document.createElement('div');
+    div.className = `result-row ${r.isCorrect ? 'correct' : 'wrong'}`;
+    const smallSvg = r.shape.svg.replace(/width="56"/g, 'width="36"').replace(/height="56"/g, 'height="36"');
+    div.innerHTML = `
+      <span class="r-icon">${r.isCorrect ? '✅' : '❌'}</span>
+      <div class="r-svg">${smallSvg}</div>
+      <div class="r-info">
+        <div class="r-name">${r.shape.name}</div>
+        <div class="r-desc">${r.shape.desc}</div>
+      </div>
+      <div class="r-ans">
+        ${r.isCorrect
+          ? `正確：${r.catLabel}`
+          : `你選：${r.userLabel}<br>正確：${r.catLabel}`
+        }
+      </div>
+    `;
+    list.appendChild(div);
+  });
+
+  document.getElementById('result-msg').textContent =
+    pct === 100 ? '太厲害了！每種海洋生物的特徵你都掌握得很好！' :
+    pct >= 70   ? '大部分分類都正確，有幾種稍微混淆了，再加油！' :
+    pct >= 40   ? '海洋生物種類繁多，容易搞混，多看幾次它們的特徵吧！' :
+                  '沒關係，分類需要多練習，仔細看看每種生物的介紹再試一次！';
+}
+
+// ══════════════════════════════════════════════
+// 重新開始
+// ══════════════════════════════════════════════
+function restartGame() {
+  showScreen('screen-start');
+}
+</script>
+</body>
+</html>

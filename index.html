@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARMS 展覽互動</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #fff;
+      padding: 40px 20px;
+    }
+    h1 { text-align: center; margin-bottom: 32px; font-size: 1.8rem; color: #aac4ff; }
+    .nav { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+    .nav a {
+      display: block; padding: 20px 24px; background: rgba(255,255,255,0.08);
+      border: 2px solid rgba(255,255,255,0.2); border-radius: 16px;
+      color: #fff; text-decoration: none; font-weight: bold; text-align: center;
+      transition: background .2s, border-color .2s;
+    }
+    .nav a:hover { background: rgba(255,255,255,0.15); border-color: #f5a623; }
+    .nav .desc { font-size: 0.9rem; color: rgba(255,255,255,0.6); margin-top: 6px; font-weight: normal; }
+  </style>
+</head>
+<body>
+  <h1>ARMS 展覽互動</h1>
+  <nav class="nav">
+    <a href="marine_sort_game.html">
+      海洋生物分類小遊戲 v3
+      <span class="desc">拖曳 12 種海洋生物到正確分類，查看生物介紹</span>
+    </a>
+    <a href="shape_sort_game.html" style="opacity:0.5;">
+      形狀分類小遊戲（原型）
+      <span class="desc">v2 原型，僅供參考</span>
+    </a>
+    <a href="gallery/index.html">
+      生物圖鑑
+      <span class="desc">（之後放圖鑑首頁）</span>
+    </a>
+  </nav>
+</body>
+</html>
